@@ -1,73 +1,122 @@
 // src/Pages/PostView.tsx
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { fetchSinglePost, createComment, deletePost, deleteComment } from '../api';
+import { useParams, useNavigate } from 'react-router-dom';
+import { fetchSinglePost, createComment, deleteComment, getCurrentUser } from '../api';
 
-export default function PostView({ isLight }: { isLight: boolean }) {
+interface PostViewProps {
+  isLight: boolean;
+}
+
+export default function PostView({ isLight }: PostViewProps) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [post, setPost] = useState<any>(null);
-  const [text, setText] = useState('');
-  const [user, setUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [commentText, setCommentText] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Refresh user state from localStorage on every view
-    const saved = localStorage.getItem('user');
-    if (saved) setUser(JSON.parse(saved));
-    
-    if (id) fetchSinglePost(id).then(setPost);
-  }, [id]);
-
-  const handleDelComm = async (cId: number) => {
-    if (!window.confirm("Delete comment?")) return;
-    await deleteComment(cId);
-    setPost({ ...post, comments: post.comments.filter((c: any) => c.id !== cId) });
+  const loadData = async () => {
+    try {
+      const [postRes, userRes] = await Promise.all([
+        fetchSinglePost(id!),
+        getCurrentUser()
+      ]);
+      setPost(postRes.data || postRes);
+      setCurrentUser(userRes);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  if (!post) return <div className="p-20 text-center uppercase font-black text-sky-500">Loading Build...</div>;
+  useEffect(() => {
+    loadData();
+  }, [id]);
+
+  const handleComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!localStorage.getItem('token')) return alert("Please login to comment");
+    try {
+      await createComment(id, commentText);
+      setCommentText('');
+      loadData(); // Refresh list
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: any) => {
+    if (!window.confirm("Delete this comment?")) return;
+    try {
+      await deleteComment(commentId);
+      loadData(); // Refresh list
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  if (loading) return <div className="p-20 text-sky-500 font-black text-center italic animate-pulse">LOADING...</div>;
+
+  // SORTING: Create a reversed copy of the comments array (last comment first)
+  const sortedComments = post?.comments ? [...post.comments].reverse() : [];
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-12">
-      <div className="flex justify-between mb-8">
-        <Link to="/" className="text-[10px] font-black uppercase text-neutral-500">← Back</Link>
-        {user?.id === post.user_id && (
-          <button onClick={() => deletePost(post.id).then(() => navigate('/'))} className="text-[10px] font-black uppercase text-red-500 border border-red-500/20 px-4 py-1 rounded-full">Delete Post</button>
-        )}
-      </div>
+      <button onClick={() => navigate(-1)} className="mb-8 text-[10px] font-black uppercase text-sky-500 hover:underline">
+        ← Back to Feed
+      </button>
 
-      <div className={`p-10 rounded-[2.5rem] border shadow-xl ${isLight ? 'bg-white border-neutral-200' : 'bg-neutral-900/30 border-white/5'}`}>
+      <div className={`p-10 rounded-[3rem] border ${
+        isLight ? 'bg-white border-neutral-200 shadow-2xl' : 'bg-neutral-900 border-white/5 shadow-black'
+      }`}>
         <h1 className="text-5xl font-black italic uppercase tracking-tighter mb-6">{post.title}</h1>
-        <p className={`text-lg leading-relaxed border-b pb-12 mb-10 ${isLight ? 'text-neutral-600 border-neutral-100' : 'text-neutral-400 border-white/5'}`}>{post.content}</p>
+        <p className={`text-lg leading-relaxed mb-12 ${isLight ? 'text-neutral-600' : 'text-neutral-300'}`}>
+          {post.content}
+        </p>
+
+        <div className={`h-px w-full mb-12 ${isLight ? 'bg-neutral-100' : 'bg-white/5'}`} />
 
         <section>
-          <h3 className="text-[10px] font-black uppercase tracking-[0.4em] text-sky-500 mb-8">Communications</h3>
+          <h3 className="text-xl font-black italic uppercase mb-8">Discussion</h3>
           
-          {localStorage.getItem('token') && (
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              const res = await createComment(post.id, text);
-              setPost({...post, comments: [res.comment, ...post.comments]});
-              setText('');
-            }} className="mb-10 flex gap-2">
-              <input value={text} onChange={e => setText(e.target.value)} placeholder="Type comment..." 
-                className={`flex-grow px-6 py-4 rounded-2xl outline-none border transition-all ${isLight ? 'bg-neutral-50 border-neutral-200 focus:border-sky-500' : 'bg-white/5 border-white/10 focus:border-sky-500'}`} />
-              <button className="bg-sky-500 text-white px-8 rounded-2xl font-black uppercase text-[10px]">Send</button>
-            </form>
-          )}
+          <form onSubmit={handleComment} className="mb-12">
+            <textarea 
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              className={`w-full p-6 rounded-3xl border outline-none transition-all focus:ring-2 focus:ring-sky-500/20 ${
+                  isLight ? 'bg-neutral-50 border-neutral-200' : 'bg-white/10 border-white/10 text-white'
+              }`}
+              placeholder="Write a comment..."
+            />
+            <button className="mt-4 bg-sky-500 text-white px-8 py-3 rounded-full text-[10px] font-black uppercase hover:bg-sky-400">
+              Post Comment
+            </button>
+          </form>
 
-          <div className="space-y-4">
-            {post.comments.map((c: any) => (
-              <div key={c.id} className={`p-6 rounded-2xl border ${isLight ? 'bg-neutral-50 border-neutral-100' : 'bg-white/5 border-white/5'}`}>
-                <div className="flex justify-between mb-2">
-                  <span className="text-xs font-black text-sky-500 uppercase">{c.user.name}</span>
-                  {/* CRITICAL FIX: Direct ID comparison with debug log if needed */}
-                  {user?.id === c.user_id && (
-                    <button onClick={() => handleDelComm(c.id)} className="text-[9px] font-black text-red-500 uppercase border border-red-500/20 px-2 py-1 rounded hover:bg-red-500 hover:text-white transition-all">Delete</button>
-                  )}
+          <div className="space-y-6">
+            {sortedComments.length > 0 ? sortedComments.map((c: any) => (
+              <div key={c.id} className={`p-6 rounded-3xl border flex justify-between items-start ${
+                isLight ? 'bg-neutral-50 border-neutral-100' : 'bg-white/5 border-white/5'
+              }`}>
+                <div>
+                  <p className="text-sm leading-relaxed">{c.content}</p>
+                  <p className="text-[9px] font-bold text-neutral-500 uppercase mt-4">User #{c.user_id}</p>
                 </div>
-                <p className={`text-sm ${isLight ? 'text-neutral-700' : 'text-neutral-400'}`}>{c.content}</p>
+                
+                {/* DELETE BUTTON: Only show if current logged in user ID matches comment's user_id */}
+                {currentUser && currentUser.id === c.user_id && (
+                  <button 
+                    onClick={() => handleDeleteComment(c.id)}
+                    className="text-[9px] font-black uppercase text-red-500 bg-red-500/10 px-3 py-1 rounded-full hover:bg-red-500 hover:text-white transition-all"
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
-            ))}
+            )) : (
+              <p className="text-neutral-600 uppercase text-[10px] font-bold italic">No comments yet.</p>
+            )}
           </div>
         </section>
       </div>

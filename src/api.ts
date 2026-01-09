@@ -1,130 +1,113 @@
 // src/api.ts
-const API_BASE = "http://exam.kodevite.com";
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
-}
+const API_BASE = "/api-proxy"; 
 
 const getHeaders = (withAuth = false) => {
   const headers: HeadersInit = {
     'Accept': 'application/json',
     'Content-Type': 'application/json',
   };
-  if (withAuth) {
-    const token = localStorage.getItem('token');
-    if (token) headers['Authorization'] = `Bearer ${token}`;
+  const token = localStorage.getItem('token');
+  if (withAuth && token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
 };
 
+// --- AUTH FUNCTIONS ---
+
+export const registerUser = async (userData: any) => {
+  const response = await fetch(`${API_BASE}/api/register`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify({
+      name: userData.name,
+      email: userData.email,
+      password: userData.password,
+      password_confirmation: userData.password_confirmation 
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Registration failed');
+  if (data.token) {
+    localStorage.setItem('token', data.token);
+    localStorage.setItem('user', JSON.stringify(data.user));
+  }
+  return data;
+};
+
+export const loginUser = async (credentials: any) => {
+  const response = await fetch(`${API_BASE}/api/login`, {
+    method: 'POST',
+    headers: getHeaders(),
+    body: JSON.stringify(credentials),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.message || 'Login failed');
+  localStorage.setItem('token', data.token);
+  localStorage.setItem('user', JSON.stringify(data.user));
+  return data;
+};
+
+export const getCurrentUser = async () => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return null;
+    const response = await fetch(`${API_BASE}/api/user`, { headers: getHeaders(true) });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch {
+    return null;
+  }
+};
+
+export const logoutUser = () => {
+  localStorage.clear();
+};
+
+// --- POST FUNCTIONS ---
+
 export const fetchPosts = async (page: number = 1) => {
   try {
     const response = await fetch(`${API_BASE}/api/posts?page=${page}`, { headers: getHeaders() });
+    if (!response.ok) return null;
     return await response.json();
   } catch (err) {
-    console.error(getErrorMessage(err));
     return null;
   }
 };
 
 export const fetchSinglePost = async (id: string | number) => {
-  try {
-    const response = await fetch(`${API_BASE}/api/posts/${id}`, { headers: getHeaders() });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Post not found');
-    return data;
-  } catch (err) { throw new Error(getErrorMessage(err)); }
+  const response = await fetch(`${API_BASE}/api/posts/${id}`, { headers: getHeaders() });
+  return await response.json();
 };
 
-export const createPost = async (postData: { title: string; content: string }) => {
-  try {
-    const response = await fetch(`${API_BASE}/api/posts`, {
-      method: 'POST',
-      headers: getHeaders(true),
-      body: JSON.stringify(postData),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Failed');
-    return data;
-  } catch (err) { throw new Error(getErrorMessage(err)); }
+export const createPost = async (postData: any) => {
+  const response = await fetch(`${API_BASE}/api/posts`, {
+    method: 'POST',
+    headers: getHeaders(true),
+    body: JSON.stringify(postData),
+  });
+  return await response.json();
 };
 
-export const createComment = async (postId: number | string, content: string) => {
-  try {
-    const response = await fetch(`${API_BASE}/api/posts/${postId}/comments`, {
-      method: 'POST',
-      headers: getHeaders(true),
-      body: JSON.stringify({ content }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Failed');
-    return data;
-  } catch (err) { throw new Error(getErrorMessage(err)); }
+export const deletePost = async (id: any) => {
+  await fetch(`${API_BASE}/api/posts/${id}`, { method: 'DELETE', headers: getHeaders(true) });
 };
 
-export const deleteComment = async (commentId: number | string) => {
-  try {
-    const response = await fetch(`${API_BASE}/api/comments/${commentId}`, {
-      method: 'DELETE',
-      headers: getHeaders(true),
-    });
-    if (!response.ok) throw new Error('Delete failed');
-    return true;
-  } catch (err) { throw new Error(getErrorMessage(err)); }
+// --- COMMENT FUNCTIONS ---
+
+export const createComment = async (postId: any, content: string) => {
+  const response = await fetch(`${API_BASE}/api/posts/${postId}/comments`, {
+    method: 'POST',
+    headers: getHeaders(true),
+    body: JSON.stringify({ content }),
+  });
+  return await response.json();
 };
 
-export const deletePost = async (postId: number | string) => {
-  try {
-    await fetch(`${API_BASE}/api/posts/${postId}`, {
-      method: 'DELETE',
-      headers: getHeaders(true),
-    });
-    return true;
-  } catch (err) { throw new Error(getErrorMessage(err)); }
-};
-
-export const loginUser = async (credentials: any) => {
-  try {
-    const response = await fetch(`${API_BASE}/api/login`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(credentials),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Login failed');
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('user', JSON.stringify(data.user));
-    return data;
-  } catch (err) { throw new Error(getErrorMessage(err)); }
-};
-
-export const registerUser = async (userData: any) => {
-  try {
-    const response = await fetch(`${API_BASE}/api/register`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify(userData),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Registration failed');
-    return data;
-  } catch (err) { throw new Error(getErrorMessage(err)); }
-};
-
-export const logoutUser = async () => {
-  try {
-    // Removed unused 'response' variable here to satisfy TS6133
-    await fetch(`${API_BASE}/api/logout`, { method: 'POST', headers: getHeaders(true) });
-  } catch (err) { console.error(err); } 
-  finally { localStorage.clear(); }
-};
-
-export const getCurrentUser = async () => {
-  try {
-    const response = await fetch(`${API_BASE}/api/user`, { headers: getHeaders(true) });
-    const data = await response.json();
-    if (response.ok) localStorage.setItem('user', JSON.stringify(data));
-    return data;
-  } catch { return null; }
+export const deleteComment = async (commentId: any) => {
+  await fetch(`${API_BASE}/api/comments/${commentId}`, { 
+    method: 'DELETE', 
+    headers: getHeaders(true) 
+  });
 };
