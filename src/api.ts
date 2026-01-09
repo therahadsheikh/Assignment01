@@ -1,4 +1,5 @@
 // src/api.ts
+const API_BASE = "http://exam.kodevite.com";
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -19,7 +20,7 @@ const getHeaders = (withAuth = false) => {
 
 export const fetchPosts = async (page: number = 1) => {
   try {
-    const response = await fetch(`/api/posts?page=${page}`, { headers: getHeaders() });
+    const response = await fetch(`${API_BASE}/api/posts?page=${page}`, { headers: getHeaders() });
     return await response.json();
   } catch (err) {
     console.error(getErrorMessage(err));
@@ -29,18 +30,16 @@ export const fetchPosts = async (page: number = 1) => {
 
 export const fetchSinglePost = async (id: string | number) => {
   try {
-    const response = await fetch(`/api/posts/${id}`, { headers: getHeaders() });
+    const response = await fetch(`${API_BASE}/api/posts/${id}`, { headers: getHeaders() });
     const data = await response.json();
     if (!response.ok) throw new Error(data.message || 'Post not found');
     return data;
-  } catch (err) {
-    throw new Error(getErrorMessage(err));
-  }
+  } catch (err) { throw new Error(getErrorMessage(err)); }
 };
 
 export const createPost = async (postData: { title: string; content: string }) => {
   try {
-    const response = await fetch('/api/posts', {
+    const response = await fetch(`${API_BASE}/api/posts`, {
       method: 'POST',
       headers: getHeaders(true),
       body: JSON.stringify(postData),
@@ -53,7 +52,7 @@ export const createPost = async (postData: { title: string; content: string }) =
 
 export const createComment = async (postId: number | string, content: string) => {
   try {
-    const response = await fetch(`/api/posts/${postId}/comments`, {
+    const response = await fetch(`${API_BASE}/api/posts/${postId}/comments`, {
       method: 'POST',
       headers: getHeaders(true),
       body: JSON.stringify({ content }),
@@ -66,7 +65,7 @@ export const createComment = async (postId: number | string, content: string) =>
 
 export const deleteComment = async (commentId: number | string) => {
   try {
-    const response = await fetch(`/api/comments/${commentId}`, {
+    const response = await fetch(`${API_BASE}/api/comments/${commentId}`, {
       method: 'DELETE',
       headers: getHeaders(true),
     });
@@ -77,7 +76,7 @@ export const deleteComment = async (commentId: number | string) => {
 
 export const deletePost = async (postId: number | string) => {
   try {
-    const response = await fetch(`/api/posts/${postId}`, {
+    await fetch(`${API_BASE}/api/posts/${postId}`, {
       method: 'DELETE',
       headers: getHeaders(true),
     });
@@ -87,7 +86,7 @@ export const deletePost = async (postId: number | string) => {
 
 export const loginUser = async (credentials: any) => {
   try {
-    const response = await fetch('/api/login', {
+    const response = await fetch(`${API_BASE}/api/login`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(credentials),
@@ -102,7 +101,7 @@ export const loginUser = async (credentials: any) => {
 
 export const registerUser = async (userData: any) => {
   try {
-    const response = await fetch('/api/register', {
+    const response = await fetch(`${API_BASE}/api/register`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(userData),
@@ -115,15 +114,15 @@ export const registerUser = async (userData: any) => {
 
 export const logoutUser = async () => {
   try {
-    await fetch('/api/logout', { method: 'POST', headers: getHeaders(true) });
-  } finally {
-    localStorage.clear();
-  }
+    // Removed unused 'response' variable here to satisfy TS6133
+    await fetch(`${API_BASE}/api/logout`, { method: 'POST', headers: getHeaders(true) });
+  } catch (err) { console.error(err); } 
+  finally { localStorage.clear(); }
 };
 
 export const getCurrentUser = async () => {
   try {
-    const response = await fetch('/api/user', { headers: getHeaders(true) });
+    const response = await fetch(`${API_BASE}/api/user`, { headers: getHeaders(true) });
     const data = await response.json();
     if (response.ok) localStorage.setItem('user', JSON.stringify(data));
     return data;
